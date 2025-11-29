@@ -1,0 +1,68 @@
+# spanish.yml - Traducción al español de dicio-numbers
+
+# Números del 0 al 20
+numbers:
+  - ["cero", 0]
+  - ["uno", 1]
+  - ["dos", 2]
+  - ["tres", 3]
+  - ["cuatro", 4]
+  - ["cinco", 5]
+  - ["seis", 6]
+  - ["siete", 7]
+  - ["ocho", 8]
+  - ["nueve", 9]
+  - ["diez", 10]
+  - ["once", 11]
+  - ["doce", 12]
+  - ["trece", 13]
+  - ["catorce", 14]
+  - ["quince", 15]
+  - ["dieciséis", 16]
+  - ["diecisiete", 17]
+  - ["dieciocho", 18]
+  - ["diecinueve", 19]
+  - ["veinte", 20]
+
+# Decenas
+tens:
+  - ["veinti", 20]
+  - ["treinta", 30]
+  - ["cuarenta", 40]
+  - ["cincuenta", 50]
+  - ["sesenta", 60]
+  - ["setenta", 70]
+  - ["ochenta", 80]
+  - ["noventa", 90]
+
+# Cientos
+hundreds:
+  - ["cien", 100]
+  - ["ciento", 100]
+  - ["doscientos", 200]
+  - ["trescientos", 300]
+  - ["cuatrocientos", 400]
+  - ["quinientos", 500]
+  - ["seiscientos", 600]
+  - ["setecientos", 700]
+  - ["ochocientos", 800]
+  - ["novecientos", 900]
+
+# Palabras clave
+and: "y"
+point: "coma"
+minus: "menos"
+
+# Unidades de tiempo
+units:
+  - ["segundo", "segundos", 1]
+  - ["minuto", "minutos", 60]
+  - ["hora", "horas", 3600]
+  - ["día", "días", 86400]
+  - ["semana", "semanas", 604800]
+
+# Unidades de longitud
+distance_units:
+  - ["metro", "metros", 1]
+  - ["kilómetro", "kilómetros", 1000]
+  - ["milla", "millas", 1609.34]
