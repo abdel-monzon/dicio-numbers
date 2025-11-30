@@ -11,6 +11,6 @@ object SpanishModule {
     fun register() {
         FormatterFactory.register("es", SpanishFormatterFactory())
         ParserFactory.register("es", SpanishParser())
-        UnitExtractor.register("es", SpanishNumberExtractor())
+        UnitExtractor.register("es", SpanishNumberExtractor::class.java)
     }
 }
