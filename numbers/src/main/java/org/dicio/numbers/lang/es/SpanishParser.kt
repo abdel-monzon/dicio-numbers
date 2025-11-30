@@ -1,35 +1,36 @@
 package org.dicio.numbers.lang.es
 
-import org.dicio.numbers.parser.NumberParser
-import org.dicio.numbers.parser.NumberWords
+import org.dicio.numbers.parser.Parser
+import org.dicio.numbers.parser.lexer.TokenStream
+import org.dicio.numbers.unit.Duration
+import org.dicio.numbers.unit.Number
+import org.dicio.numbers.util.DurationExtractorUtils
+import java.time.LocalDateTime
 
-class SpanishParser : NumberParser {
-    override fun getLanguage() = "es"
+class SpanishParser : Parser("config/es") {
+    override fun extractNumber(
+        tokenStream: TokenStream,
+        shortScale: Boolean,
+        preferOrdinal: Boolean
+    ): () -> Number? {
+        val numberExtractor = SpanishNumberExtractor(tokenStream, shortScale)
+        return numberExtractor::numberPreferOrdinal
+    }
 
-    override fun getNumberWords() = NumberWords(
-        mapOf(
-            "cero" to 0L,
-            "uno" to 1L,
-            "dos" to 2L,
-            "tres" to 3L,
-            "cuatro" to 4L,
-            "cinco" to 5L,
-            "seis" to 6L,
-            "siete" to 7L,
-            "ocho" to 8L,
-            "nueve" to 9L,
-            "diez" to 10L
-        ),
-        mapOf(
-            "primero" to 1L,
-            "segundo" to 2L,
-            "tercero" to 3L
-        )
-    )
+    override fun extractDuration(
+        tokenStream: TokenStream,
+        shortScale: Boolean
+    ): () -> Duration? {
+        val numberExtractor = SpanishNumberExtractor(tokenStream, shortScale)
+        return DurationExtractorUtils(tokenStream, numberExtractor::numberNoOrdinal)::duration
+    }
 
-    override fun getOrdinalWords() = mapOf(
-        "primero" to 1L,
-        "segundo" to 2L,
-        "tercero" to 3L
-    )
+    override fun extractDateTime(
+        tokenStream: TokenStream,
+        shortScale: Boolean,
+        preferMonthBeforeDay: Boolean,
+        now: LocalDateTime
+    ): () -> LocalDateTime? {
+        return SpanishDateTimeExtractor(tokenStream, shortScale, preferMonthBeforeDay, now)::dateTime
+    }
 }
