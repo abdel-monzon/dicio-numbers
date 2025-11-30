@@ -5,7 +5,6 @@ import org.dicio.numbers.unit.MixedFraction
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlin.math.abs
 
 class SpanishFormatter : Formatter("config/es") {
 
@@ -106,8 +105,8 @@ class SpanishFormatter : Formatter("config/es") {
         use24Hour: Boolean,
         showAmPm: Boolean
     ): String {
-        if (speech) {
-            return if (use24Hour) {
+        return if (speech) {
+            if (use24Hour) {
                 "${time.hour} horas y ${time.minute} minutos"
             } else {
                 when {
@@ -120,7 +119,7 @@ class SpanishFormatter : Formatter("config/es") {
                 }
             }
         } else {
-            return if (use24Hour) {
+            if (use24Hour) {
                 time.format(DateTimeFormatter.ofPattern("HH:mm", Locale("es")))
             } else {
                 val hour12 = if (time.hour > 12) time.hour - 12 else if (time.hour == 0) 12 else time.hour
