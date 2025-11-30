@@ -5,15 +5,20 @@ import org.dicio.numbers.parser.NumberWords
 
 class SpanishParser : NumberParser {
     override fun getLanguage() = "es"
+
     override fun getNumberWords() = NumberWords(
-        // aquí irían las palabras numéricas españolas
         mapOf(
             "cero" to 0L,
             "uno" to 1L,
             "dos" to 2L,
             "tres" to 3L,
             "cuatro" to 4L,
-            "cinco" to 5L
+            "cinco" to 5L,
+            "seis" to 6L,
+            "siete" to 7L,
+            "ocho" to 8L,
+            "nueve" to 9L,
+            "diez" to 10L
         ),
         mapOf(
             "primero" to 1L,
