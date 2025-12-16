@@ -203,16 +203,19 @@ class SpanishDateTimeExtractor internal constructor(
 
         if (ts[0].hasCategory(category)) {
             ts.movePositionForwardBy(1)
-            return ((ts[-1].number!!.integerValue().toInt() +
-                    DateTimeExtractorUtils.HOURS_IN_DAY + relativeIndicator)
-                    % DateTimeExtractorUtils.HOURS_IN_DAY)
+            val number = ts[-1].number
+            if (number != null) {
+                return ((number.integerValue().toInt() + DateTimeExtractorUtils.HOURS_IN_DAY + relativeIndicator) % DateTimeExtractorUtils.HOURS_IN_DAY)
+            }
         }
 
-        if (ts[0].value.startsWith("medi")) {
-            if (ts[1].value.startsWith("día") || ts[1].value.startsWith("dia")) {
+        // FIX: Safe null handling for "medi" detection
+        if (ts.size >= 2 && ts[0].value.startsWith("medi")) {
+            val nextWord = ts[1].value.lowercase()
+            if (nextWord.startsWith("día") || nextWord.startsWith("dia")) {
                 ts.movePositionForwardBy(2)
                 return 12 + relativeIndicator
-            } else if (ts[1].value.startsWith("noche")) {
+            } else if (nextWord.startsWith("noche")) {
                 ts.movePositionForwardBy(2)
                 return (DateTimeExtractorUtils.HOURS_IN_DAY + relativeIndicator) % DateTimeExtractorUtils.HOURS_IN_DAY
             }
@@ -249,20 +252,23 @@ class SpanishDateTimeExtractor internal constructor(
     fun relativeYesterday(): Int? {
         val originalPosition = ts.position
         var dayCount = 0
-        while (ts[0].hasCategory("yesterday_adder")) {
+        // FIX: Check bounds before accessing tokens
+        while (ts.position < ts.size && ts[0].hasCategory("yesterday_adder")) {
             ++dayCount
             ts.movePositionForwardBy(ts.indexOfWithoutCategory("date_time_ignore", 1))
         }
 
-        if (!ts[0].hasCategory("yesterday")) {
+        if (ts.position >= ts.size || !ts[0].hasCategory("yesterday")) {
             ts.position = originalPosition
             return null
         }
         ts.movePositionForwardBy(1)
         ++dayCount
 
+        // FIX: Safe bounds checking
         val nextNotIgnore = ts.indexOfWithoutCategory("date_time_ignore", 0)
-        if (dayCount == 1 && ts[nextNotIgnore].hasCategory("yesterday_adder")) {
+        if (dayCount == 1 && ts.position < ts.size && nextNotIgnore < ts.size 
+            && ts[nextNotIgnore].hasCategory("yesterday_adder")) {
             ++dayCount
             ts.movePositionForwardBy(nextNotIgnore + 1)
         }
@@ -272,12 +278,13 @@ class SpanishDateTimeExtractor internal constructor(
     fun relativeTomorrow(): Int? {
         val originalPosition = ts.position
         var dayCount = 0
-        while (ts[0].hasCategory("tomorrow_adder")) {
+        // FIX: Check bounds before accessing tokens
+        while (ts.position < ts.size && ts[0].hasCategory("tomorrow_adder")) {
             ++dayCount
             ts.movePositionForwardBy(ts.indexOfWithoutCategory("date_time_ignore", 1))
         }
 
-        if (!ts[0].hasCategory("tomorrow")) {
+        if (ts.position >= ts.size || !ts[0].hasCategory("tomorrow")) {
             ts.position = originalPosition
             return null
         }
@@ -293,3 +300,4 @@ class SpanishDateTimeExtractor internal constructor(
         )
     }
 }
+
