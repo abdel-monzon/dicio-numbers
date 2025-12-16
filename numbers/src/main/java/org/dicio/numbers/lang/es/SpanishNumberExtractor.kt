@@ -190,3 +190,4 @@ class SpanishNumberExtractor internal constructor(private val ts: TokenStream) {
         return n
     }
 }
+
