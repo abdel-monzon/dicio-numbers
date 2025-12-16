@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 
-class SpanishFormatter : Formatter("config/es-ES") {
+class SpanishFormatter : Formatter("config/es-es") { // FIX: lowercase path
 
     override fun niceNumber(mixedFraction: MixedFraction, speech: Boolean): String {
         if (speech) {
@@ -26,13 +26,15 @@ class SpanishFormatter : Formatter("config/es-ES") {
             val numeratorString = if (mixedFraction.numerator == 1) {
                 "un"
             } else {
-                if (denominatorString.endsWith("o")) {
-                    denominatorString = denominatorString.substring(0, denominatorString.length - 1) + "os"
+                // FIX: Handle null safely
+                val denominatorName = if (denominatorString.endsWith("o")) {
+                    denominatorString.substring(0, denominatorString.length - 1) + "os"
                 } else if (denominatorString.endsWith("e")) {
-                    denominatorString = denominatorString.substring(0, denominatorString.length - 1) + "es"
+                    denominatorString.substring(0, denominatorString.length - 1) + "es"
                 } else {
-                    denominatorString += "s"
+                    denominatorString + "s"
                 }
+                denominatorString = denominatorName
                 pronounceNumber(mixedFraction.numerator.toDouble(), 0, true, false, false)
             }
 
@@ -94,9 +96,7 @@ class SpanishFormatter : Formatter("config/es-ES") {
         if (realOrdinal && ORDINAL_NAMES.containsKey(numberLong)) {
             result.append(ORDINAL_NAMES[numberLong])
         } else if (!realOrdinal && NUMBER_NAMES.containsKey(numberLong)) {
-            if (varNumber > 1000) {
-                result.append("un ")
-            }
+            // FIX: Remove arbitrary condition that breaks numbers > 1000
             result.append(NUMBER_NAMES[numberLong])
         } else {
             val groups = Utils.splitByModulus(numberLong, 1000)
@@ -138,10 +138,14 @@ class SpanishFormatter : Formatter("config/es-ES") {
             appendSplitGroups(result, groupNames)
 
             if (ordinal && numberIsWhole) {
-                // Ordinalización básica (se puede mejorar)
-                if (result.endsWith(" diez")) {
-                    result.deleteRange(result.length - 5, result.length)
-                    result.append("décimo")
+                // FIX: Better ordinal handling
+                if (numberLong % 10 == 0L && NUMBER_NAMES.containsKey(numberLong)) {
+                    val baseName = NUMBER_NAMES[numberLong]
+                    if (baseName != null && baseName.endsWith("ésimo")) {
+                        result.append(baseName)
+                    } else {
+                        result.append("ésimo")
+                    }
                 } else {
                     result.append("avo")
                 }
@@ -157,7 +161,13 @@ class SpanishFormatter : Formatter("config/es-ES") {
             val fractionalPart = String.format("%." + realPlaces + "f", varNumber % 1)
             for (i in 2 until fractionalPart.length) {
                 result.append(" ")
-                result.append(NUMBER_NAMES[(fractionalPart[i].code - '0'.code).toLong()])
+                val digit = (fractionalPart[i].code - '0'.code).toLong()
+                val digitName = NUMBER_NAMES[digit]
+                if (digitName != null) {
+                    result.append(digitName)
+                } else {
+                    result.append("cero")
+                }
             }
         }
 
@@ -283,8 +293,13 @@ class SpanishFormatter : Formatter("config/es-ES") {
                     requiresSpace = true
                 }
                 else -> {
-                    builder.append(NUMBER_NAMES[hundred])
-                    builder.append("cientos")
+                    val hundredName = NUMBER_NAMES[hundred]
+                    if (hundredName != null) {
+                        builder.append(hundredName)
+                        builder.append("cientos")
+                    } else {
+                        builder.append("ciento")
+                    }
                     requiresSpace = true
                 }
             }
@@ -296,18 +311,36 @@ class SpanishFormatter : Formatter("config/es-ES") {
                 builder.append(" ")
             }
             if (NUMBER_NAMES.containsKey(lastTwoDigits)) {
-                builder.append(NUMBER_NAMES[lastTwoDigits])
+                val name = NUMBER_NAMES[lastTwoDigits]
+                if (name != null) {
+                    builder.append(name)
+                } else {
+                    builder.append("cero")
+                }
             } else {
                 val ten = (lastTwoDigits / 10) * 10
                 val unit = lastTwoDigits % 10
                 if (ten != 0L) {
-                    builder.append(NUMBER_NAMES[ten])
+                    val tenName = NUMBER_NAMES[ten]
+                    if (tenName != null) {
+                        builder.append(tenName)
+                    }
                     if (unit != 0L) {
                         builder.append(" y ")
-                        builder.append(NUMBER_NAMES[unit])
+                        val unitName = NUMBER_NAMES[unit]
+                        if (unitName != null) {
+                            builder.append(unitName)
+                        } else {
+                            builder.append("cero")
+                        }
                     }
                 } else {
-                    builder.append(NUMBER_NAMES[unit])
+                    val unitName = NUMBER_NAMES[unit]
+                    if (unitName != null) {
+                        builder.append(unitName)
+                    } else {
+                        builder.append("cero")
+                    }
                 }
             }
         }
@@ -419,3 +452,4 @@ class SpanishFormatter : Formatter("config/es-ES") {
         )
     }
 }
+
