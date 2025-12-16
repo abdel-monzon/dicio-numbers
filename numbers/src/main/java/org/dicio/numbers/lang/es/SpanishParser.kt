@@ -1,3 +1,4 @@
+
 package org.dicio.numbers.lang.es
 
 import org.dicio.numbers.parser.Parser
@@ -7,7 +8,7 @@ import org.dicio.numbers.unit.Number
 import org.dicio.numbers.util.DurationExtractorUtils
 import java.time.LocalDateTime
 
-class SpanishParser : Parser("config/es-ES") {
+class SpanishParser : Parser("config/es-es") { // FIX: lowercase path
     override fun extractNumber(
         tokenStream: TokenStream,
         shortScale: Boolean,
