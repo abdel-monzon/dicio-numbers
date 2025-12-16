@@ -465,6 +465,39 @@
         "exactas",
         "exactos"
       ]
+    },
+    {
+      "categories": [
+        "yesterday_adder"
+      ],
+      "values": [
+        "ayer"
+      ]
+    },
+    {
+      "categories": [
+        "tomorrow_adder"
+      ],
+      "values": [
+        "mañana"
+      ]
+    },
+    {
+      "categories": [
+        "today_adder"
+      ],
+      "values": [
+        "hoy"
+      ]
+    },
+    {
+      "categories": [
+        "noon_midnight_like"
+      ],
+      "values": [
+        "mediodía",
+        "medianoche"
+      ]
     }
   ],
   "number_mappings": [
@@ -661,7 +694,6 @@
         "docena": 12,
         "docenas": 12,
         "porciento": 0.01,
-        "porciento": 0.01,
         "pct": 0.01,
         "pc": 0.01,
         "%": 0.01,
@@ -831,4 +863,4 @@
     "a"
   ]
     }
-        
+    
