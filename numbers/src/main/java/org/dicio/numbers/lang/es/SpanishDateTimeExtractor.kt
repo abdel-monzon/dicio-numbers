@@ -1,3 +1,4 @@
+
 package org.dicio.numbers.lang.es
 
 import org.dicio.numbers.parser.lexer.TokenStream
@@ -19,10 +20,14 @@ class SpanishDateTimeExtractor internal constructor(
     private val durationExtractor = DurationExtractorUtils(ts, numberExtractor::numberNoOrdinal)
     private val dateTimeExtractor = DateTimeExtractorUtils(ts, now, this::extractIntegerInRange)
 
-    private fun extractIntegerInRange(fromInclusive: Int, toInclusive: Int): Int? {
+    private fun extractIntegerInRange(
+        fromInclusive: Int,
+        toInclusive: Int,
+        allowOrdinal: Boolean = false
+    ): Int? {
         return NumberExtractorUtils.extractOneIntegerInRange(
             ts, fromInclusive, toInclusive
-        ) { NumberExtractorUtils.signBeforeNumber(ts) { numberExtractor.numberInteger(false) } }
+        ) { NumberExtractorUtils.signBeforeNumber(ts) { numberExtractor.numberInteger(allowOrdinal) } }
     }
 
     fun dateTime(): LocalDateTime? {
@@ -108,14 +113,30 @@ class SpanishDateTimeExtractor internal constructor(
     }
 
     fun time(): LocalTime? {
-        val hour = Utils.firstNotNull(this::noonMidnightLike, this::hour) ?: return null
+        val originalPosition = ts.position
+        val specialMinute = specialMinute()
+
+        val hour = Utils.firstNotNull(this::noonMidnightLike, this::hour)
+        if (hour == null) {
+            ts.position = originalPosition
+            return null
+        } else if (specialMinute != null) {
+            return if (specialMinute < 0) {
+                LocalTime.of(
+                    (hour + DateTimeExtractorUtils.HOURS_IN_DAY - 1) % DateTimeExtractorUtils.HOURS_IN_DAY,
+                    60 + specialMinute
+                )
+            } else {
+                LocalTime.of(hour, specialMinute)
+            }
+        }
         var result = LocalTime.of(hour, 0)
 
-        val minute = ts.tryOrSkipDateTimeIgnore(
-            true
-        ) {
-            Utils.firstNotNull(this::specialMinute, dateTimeExtractor::minute)
+        if (oClock()) {
+            return result
         }
+
+        val minute = ts.tryOrSkipDateTimeIgnore(true) { dateTimeExtractor.minute() }
         if (minute == null) {
             return result
         }
@@ -132,53 +153,81 @@ class SpanishDateTimeExtractor internal constructor(
         var result = now.toLocalDate()
 
         val dayOfWeek = dateTimeExtractor.dayOfWeek()
-        val day = ts.tryOrSkipDateTimeIgnore(
+        val firstNum = ts.tryOrSkipDateTimeIgnore(
             dayOfWeek != null
-        ) { extractIntegerInRange(1, 31) }
+        ) { extractIntegerInRange(1, 31, true) }
 
-        if (day == null) {
-            if (dayOfWeek != null) {
-                return result.plus((dayOfWeek - result.dayOfWeek.ordinal).toLong(), ChronoUnit.DAYS)
-            }
-            result = result.withDayOfMonth(1)
-        } else {
-            result = result.withDayOfMonth(day)
+        if (firstNum == null && dayOfWeek != null) {
+            return result.plus((dayOfWeek - result.dayOfWeek.ordinal).toLong(), ChronoUnit.DAYS)
         }
 
-        val month = ts.tryOrSkipDateTimeIgnore(day != null) {
-            Utils.firstNotNull(dateTimeExtractor::monthName, { extractIntegerInRange(1, 12) })
-        }
-        if (month == null) {
-            if (day != null) {
-                return result
+        val monthName = ts.tryOrSkipDateTimeIgnore(
+            firstNum != null
+        ) { dateTimeExtractor.monthName() }
+        if (monthName == null) {
+            result = if (firstNum == null) {
+                result.withDayOfMonth(1).withMonth(1)
+            } else {
+                val secondNumMax = if (firstNum <= 12) 31 else 12
+                val secondNum = ts.tryOrSkipDateTimeIgnore(
+                    true
+                ) { extractIntegerInRange(1, secondNumMax, true) }
+
+                if (secondNum == null) {
+                    return result.withDayOfMonth(firstNum)
+                } else {
+                    if (secondNum > 12 && firstNum <= 12) {
+                        result.withDayOfMonth(secondNum).withMonth(firstNum)
+                    } else {
+                        result.withDayOfMonth(firstNum).withMonth(secondNum)
+                    }
+                }
             }
-            result = result.withMonth(1)
         } else {
-            result = result.withMonth(month)
+            result = result.withMonth(monthName)
+
+            if (firstNum == null) {
+                val secondNum = ts.tryOrSkipDateTimeIgnore(
+                    true
+                ) { extractIntegerInRange(1, 31, true) }
+                result = if (secondNum == null) {
+                    result.withDayOfMonth(1)
+                } else {
+                    result.withDayOfMonth(secondNum)
+                }
+            } else {
+                result = result.withDayOfMonth(firstNum)
+            }
         }
+        val dayOrMonthFound = firstNum != null || monthName != null
+
+        var bcad = ts.tryOrSkipDateTimeIgnore(dayOrMonthFound) { this.bcad() }
 
         val year = ts.tryOrSkipDateTimeIgnore(
-            month != null
+            dayOrMonthFound && bcad == null
         ) { extractIntegerInRange(0, 999999999) }
         if (year == null) {
-            if (month != null) {
+            if (dayOrMonthFound) {
                 return result
             }
             return null
         }
 
-        val bcad = dateTimeExtractor.bcad()
+        if (bcad == null) {
+            bcad = bcad()
+        }
         return result.withYear(year * (if (bcad == null || bcad) 1 else -1))
     }
 
-    fun specialMinute(): Int? {
-        val originalPosition = ts.position
-        val number = numberExtractor.numberNoOrdinal()
-        if (number != null && number.isDecimal && number.decimalValue() > 0.0 && number.decimalValue() < 1.0) {
-            return Utils.roundToInt(number.decimalValue() * 60)
+    fun bcad(): Boolean? {
+        val bcad = dateTimeExtractor.bcad()
+        if (bcad != null && !bcad) {
+            val nextNotIgnore = ts.indexOfWithoutCategory("date_time_ignore", 0)
+            if (ts[nextNotIgnore].hasCategory("bcad_era")) {
+                ts.movePositionForwardBy(nextNotIgnore + 1)
+            }
         }
-        ts.position = originalPosition
-        return null
+        return bcad
     }
 
     fun noonMidnightLike(): Int? {
@@ -191,6 +240,7 @@ class SpanishDateTimeExtractor internal constructor(
 
     private fun noonMidnightLikeOrMomentOfDay(category: String): Int? {
         val originalPosition = ts.position
+
         var relativeIndicator = 0
         if (ts[0].hasCategory("pre_special_hour")) {
             if (ts[0].hasCategory("pre_relative_indicator")) {
@@ -203,22 +253,9 @@ class SpanishDateTimeExtractor internal constructor(
 
         if (ts[0].hasCategory(category)) {
             ts.movePositionForwardBy(1)
-            val number = ts[-1].number
-            if (number != null) {
-                return ((number.integerValue().toInt() + DateTimeExtractorUtils.HOURS_IN_DAY + relativeIndicator) % DateTimeExtractorUtils.HOURS_IN_DAY)
-            }
-        }
-
-        // FIX: Safe null handling for "medi" detection
-        if (ts.size >= 2 && ts[0].value.startsWith("medi")) {
-            val nextWord = ts[1].value.lowercase()
-            if (nextWord.startsWith("día") || nextWord.startsWith("dia")) {
-                ts.movePositionForwardBy(2)
-                return 12 + relativeIndicator
-            } else if (nextWord.startsWith("noche")) {
-                ts.movePositionForwardBy(2)
-                return (DateTimeExtractorUtils.HOURS_IN_DAY + relativeIndicator) % DateTimeExtractorUtils.HOURS_IN_DAY
-            }
+            return ((ts[-1].number!!.integerValue()
+                .toInt() + DateTimeExtractorUtils.HOURS_IN_DAY + relativeIndicator)
+                    % DateTimeExtractorUtils.HOURS_IN_DAY)
         }
 
         ts.position = originalPosition
@@ -236,6 +273,55 @@ class SpanishDateTimeExtractor internal constructor(
         return number % DateTimeExtractorUtils.HOURS_IN_DAY
     }
 
+    fun specialMinute(): Int? {
+        val originalPosition = ts.position
+        ts.movePositionForwardBy(ts.indexOfWithoutCategory("pre_hour", 0))
+        val number = numberExtractor.numberNoOrdinal()
+        if (number != null) {
+            val minutes: Int
+            if (number.isDecimal && number.decimalValue() > 0.0 && number.decimalValue() < 1.0) {
+                minutes = Utils.roundToInt(number.decimalValue() * 60)
+            } else if (number.isInteger && number.integerValue() > 1 && number.integerValue() < 60) {
+                minutes = number.integerValue().toInt()
+            } else {
+                ts.position = originalPosition
+                return null
+            }
+
+            val result = ts.tryOrSkipDateTimeIgnore(true) {
+                if (ts[0].hasCategory("special_minute_after")) {
+                    ts.movePositionForwardBy(1)
+                    return@tryOrSkipDateTimeIgnore minutes
+                } else if (ts[0].hasCategory("special_minute_before")) {
+                    ts.movePositionForwardBy(1)
+                    return@tryOrSkipDateTimeIgnore -minutes
+                } else {
+                    return@tryOrSkipDateTimeIgnore null
+                }
+            }
+            if (result != null) {
+                return result
+            }
+        }
+
+        ts.position = originalPosition
+        return null
+    }
+
+    fun oClock(): Boolean {
+        if (ts[0].hasCategory("pre_oclock")) {
+            val nextNotIgnore = ts.indexOfWithoutCategory("date_time_ignore", 1)
+            if (ts[nextNotIgnore].hasCategory("post_oclock")) {
+                ts.movePositionForwardBy(nextNotIgnore + 1)
+                return true
+            }
+        } else if (ts[0].hasCategory("oclock_combined")) {
+            ts.movePositionForwardBy(1)
+            return true
+        }
+        return false
+    }
+
     private fun relativeSpecialDay(): LocalDate? {
         val days = Utils.firstNotNull(
             this::relativeYesterday,
@@ -250,47 +336,55 @@ class SpanishDateTimeExtractor internal constructor(
     }
 
     fun relativeYesterday(): Int? {
-        val originalPosition = ts.position
-        var dayCount = 0
-        // FIX: Check bounds before accessing tokens
-        while (ts.position < ts.size && ts[0].hasCategory("yesterday_adder")) {
-            ++dayCount
-            ts.movePositionForwardBy(ts.indexOfWithoutCategory("date_time_ignore", 1))
+        if (ts[0].hasCategory("day_adder_the")
+            && ts[1].hasCategory("day_adder_day")
+            && ts[2].hasCategory("day_adder_before")
+            && ts[3].hasCategory("yesterday")
+        ) {
+            ts.movePositionForwardBy(4)
+            return -2
         }
 
-        if (ts.position >= ts.size || !ts[0].hasCategory("yesterday")) {
-            ts.position = originalPosition
+        if (ts[0].hasCategory("day_adder_day")
+            && ts[1].hasCategory("day_adder_before")
+            && ts[2].hasCategory("yesterday")
+        ) {
+            ts.movePositionForwardBy(3)
+            return -2
+        }
+
+        if (ts[0].hasCategory("yesterday")) {
+            ts.movePositionForwardBy(1)
+            return -1
+        } else {
             return null
         }
-        ts.movePositionForwardBy(1)
-        ++dayCount
-
-        // FIX: Safe bounds checking
-        val nextNotIgnore = ts.indexOfWithoutCategory("date_time_ignore", 0)
-        if (dayCount == 1 && ts.position < ts.size && nextNotIgnore < ts.size 
-            && ts[nextNotIgnore].hasCategory("yesterday_adder")) {
-            ++dayCount
-            ts.movePositionForwardBy(nextNotIgnore + 1)
-        }
-        return -dayCount
     }
 
     fun relativeTomorrow(): Int? {
-        val originalPosition = ts.position
-        var dayCount = 0
-        // FIX: Check bounds before accessing tokens
-        while (ts.position < ts.size && ts[0].hasCategory("tomorrow_adder")) {
-            ++dayCount
-            ts.movePositionForwardBy(ts.indexOfWithoutCategory("date_time_ignore", 1))
+        if (ts[0].hasCategory("day_adder_the")
+            && ts[1].hasCategory("day_adder_day")
+            && ts[2].hasCategory("day_adder_after")
+            && ts[3].hasCategory("tomorrow")
+        ) {
+            ts.movePositionForwardBy(4)
+            return 2
         }
 
-        if (ts.position >= ts.size || !ts[0].hasCategory("tomorrow")) {
-            ts.position = originalPosition
+        if (ts[0].hasCategory("day_adder_day")
+            && ts[1].hasCategory("day_adder_after")
+            && ts[2].hasCategory("tomorrow")
+        ) {
+            ts.movePositionForwardBy(3)
+            return 2
+        }
+
+        if (ts[0].hasCategory("tomorrow")) {
+            ts.movePositionForwardBy(1)
+            return 1
+        } else {
             return null
         }
-        ts.movePositionForwardBy(1)
-        ++dayCount
-        return dayCount
     }
 
     fun relativeDuration(): Duration? {
@@ -300,4 +394,3 @@ class SpanishDateTimeExtractor internal constructor(
         )
     }
 }
-
